@@ -1,13 +1,19 @@
 <?php
 /**
  * Telemetry API Endpoint
- * Fetch real-time telemetry data from tracking server
+ * Fetches real-time telemetry data from uradi (Traccar) database
+ * 
+ * Data Flow:
+ * 1. User views vehicle from alexa.vehicles (serial field)
+ * 2. System finds device in uradi.devices where uniqueid = alexa.vehicles.serial
+ * 3. System fetches telemetry from uradi.eventData where deviceid = uradi.devices.id
  */
 
 session_start();
 header('Content-Type: application/json');
 
 require_once '../config/config.php';
+require_once '../config/database.php';
 
 $response = ['success' => false, 'message' => '', 'data' => null];
 
@@ -18,59 +24,70 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Get vehicle ID
-$vehicleId = isset($_GET['vehicle_id']) ? intval($_GET['vehicle_id']) : 0;
+// Get vehicle serial from request (links alexa.vehicles.serial to uradi.devices.uniqueid)
+$serial = isset($_GET['serial']) ? trim($_GET['serial']) : '';
 
-if ($vehicleId <= 0) {
-    $response['message'] = 'Invalid vehicle ID';
+if (empty($serial)) {
+    $response['message'] = 'Vehicle serial required';
     echo json_encode($response);
     exit;
 }
 
 try {
-    // Connect to remote tracking server
-    $trackingUrl = TRACKING_SERVER_URL . '/vehicle/' . $vehicleId . '/telemetry';
+    // Connect to Uradi database (Traccar - telemetry data)
+    $uradiPDO = getUradiDB();
     
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $trackingUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TRACKING_SERVER_TIMEOUT);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Accept: application/json'
-    ]);
+    // Step 1: Find device by uniqueid (which equals alexa.vehicles.serial)
+    $deviceStmt = $uradiPDO->prepare("SELECT id, name, status, lastUpdate FROM devices WHERE uniqueid = ? AND disabled = 0");
+    $deviceStmt->execute([$serial]);
+    $device = $deviceStmt->fetch();
     
-    $telemetryData = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
+    if (!$device) {
+        $response['message'] = 'Device not found for serial: ' . $serial;
+        echo json_encode($response);
+        exit;
+    }
     
-    curl_close($ch);
+    $deviceId = $device['id'];
     
-    if ($httpCode === 200 && $telemetryData) {
-        $data = json_decode($telemetryData, true);
+    // Step 2: Get latest telemetry data from eventData for this device
+    $telemetryStmt = $uradiPDO->prepare("
+        SELECT 
+            id, type, serverTime, eventTime, latitude, longitude, altitude,
+            speed, course, address, accuracy, batteryLevel, fuelLevel,
+            rpm, power, motion, totalDistance
+        FROM eventData 
+        WHERE deviceId = ? 
+        ORDER BY eventTime DESC 
+        LIMIT 1
+    ");
+    $telemetryStmt->execute([$deviceId]);
+    $telemetry = $telemetryStmt->fetch();
+    
+    if ($telemetry) {
+        // Add device info to response
+        $telemetry['device_name'] = $device['name'];
+        $telemetry['device_status'] = $device['status'];
+        $telemetry['last_update'] = $device['lastUpdate'];
+        $telemetry['serial'] = $serial;
+        
         $response['success'] = true;
-        $response['data'] = $data;
+        $response['data'] = $telemetry;
     } else {
-        // Return mock data for demonstration (remove in production)
         $response['success'] = true;
         $response['data'] = [
-            'vehicle_id' => $vehicleId,
-            'timestamp' => date('Y-m-d H:i:s'),
-            'latitude' => 40.7128 + (rand() / getrandmax() * 0.01),
-            'longitude' => -74.0060 + (rand() / getrandmax() * 0.01),
-            'speed' => rand(0, 120),
-            'heading' => rand(0, 360),
-            'altitude' => rand(0, 500),
-            'fuel_level' => rand(10, 100),
-            'engine_status' => rand(0, 1) ? 'running' : 'stopped',
-            'odometer' => rand(10000, 100000)
+            'device_name' => $device['name'],
+            'device_status' => $device['status'],
+            'last_update' => $device['lastUpdate'],
+            'serial' => $serial,
+            'message' => 'No telemetry data available'
         ];
-        $response['message'] = 'Using mock data (tracking server unavailable)';
+        $response['message'] = 'Device found but no telemetry data';
     }
     
 } catch (Exception $e) {
     error_log("Telemetry error: " . $e->getMessage());
-    $response['message'] = 'Failed to fetch telemetry data';
+    $response['message'] = 'Failed to fetch telemetry: ' . $e->getMessage();
 }
 
 echo json_encode($response);

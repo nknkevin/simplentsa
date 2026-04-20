@@ -30,6 +30,7 @@ require_once 'config/config.php';
                     <span class="user-name">Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?> (<?php echo htmlspecialchars($_SESSION['role']); ?>)</span>
                     <?php if ($_SESSION['role'] === 'admin'): ?>
                         <a href="admin/users.php" class="btn btn-secondary">User Management</a>
+                        <a href="admin/vehicles.php" class="btn btn-secondary">Vehicle Management</a>
                     <?php endif; ?>
                     <button id="logout-btn" class="btn btn-danger">Logout</button>
                 </div>
@@ -38,7 +39,7 @@ require_once 'config/config.php';
             <!-- Search Box -->
             <div class="search-box">
                 <div class="search-input-wrapper">
-                    <input type="text" id="search-input" class="form-control" placeholder="Search vehicles by name, plate, or VIN...">
+                    <input type="text" id="search-input" class="form-control" placeholder="Search vehicles by name, plate, VIN, customer, or serial...">
                     <button id="search-btn" class="btn btn-primary">Search</button>
                 </div>
             </div>

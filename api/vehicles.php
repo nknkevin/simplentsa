@@ -1,7 +1,10 @@
 <?php
 /**
- * Vehicle Search API Endpoint
- * Search vehicles from remote database
+ * Vehicle Management API Endpoint
+ * Fetches vehicle data from alexa database (synced from external server)
+ * Schema matches external server: reg_no, contact, cus_name, make, model, vin_no, 
+ * chasis, dealer, action, tech, serial, date, status_renew, number, warning_sent, 
+ * sms_sent, upd_time, online, online_i
  */
 
 session_start();
@@ -20,28 +23,48 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    // Get search parameters
+    // Connect to Alexa database (contains users + vehicles)
+    $pdo = getAlexaDB();
+    
+    // Handle GET requests (search/view operations)
+    // Note: Vehicle data is managed by external server, read-only here
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
-    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 20;
+    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 50;
     
-    $pdo = getVehicleDB();
-    
-    // Build search query
+    // Build search query across all relevant fields
     if (!empty($search)) {
         $stmt = $pdo->prepare("
-            SELECT id, vehicle_name, plate_number, vin, model, year, status 
+            SELECT id, reg_no, contact, cus_name, make, model, vin_no, chasis, 
+                   dealer, action, tech, serial, date, status_renew, number, 
+                   warning_sent, sms_sent, upd_time, online, online_i
             FROM vehicles 
-            WHERE vehicle_name LIKE ? 
-               OR plate_number LIKE ? 
-               OR vin LIKE ?
+            WHERE reg_no LIKE ? 
+               OR contact LIKE ?
+               OR cus_name LIKE ?
+               OR make LIKE ?
+               OR model LIKE ?
+               OR vin_no LIKE ?
+               OR chasis LIKE ?
+               OR dealer LIKE ?
+               OR action LIKE ?
+               OR tech LIKE ?
+               OR serial LIKE ?
+               OR number LIKE ?
             LIMIT ?
         ");
         $searchTerm = "%{$search}%";
-        $stmt->execute([$searchTerm, $searchTerm, $searchTerm, $limit]);
+        $stmt->execute([
+            $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm,
+            $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm,
+            $searchTerm, $searchTerm, $limit
+        ]);
     } else {
         $stmt = $pdo->prepare("
-            SELECT id, vehicle_name, plate_number, vin, model, year, status 
+            SELECT id, reg_no, contact, cus_name, make, model, vin_no, chasis, 
+                   dealer, action, tech, serial, date, status_renew, number, 
+                   warning_sent, sms_sent, upd_time, online, online_i
             FROM vehicles 
+            ORDER BY upd_time DESC
             LIMIT ?
         ");
         $stmt->execute([$limit]);
@@ -51,10 +74,11 @@ try {
     
     $response['success'] = true;
     $response['data'] = $vehicles;
+    $response['count'] = count($vehicles);
     
 } catch (Exception $e) {
-    error_log("Vehicle search error: " . $e->getMessage());
-    $response['message'] = 'Failed to search vehicles';
+    error_log("Vehicle API error: " . $e->getMessage());
+    $response['message'] = 'Failed to fetch vehicles: ' . $e->getMessage();
 }
 
 echo json_encode($response);

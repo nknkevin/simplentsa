@@ -1,40 +1,43 @@
 <?php
 /**
  * Database Configuration File
- * Configure your remote vehicle database connection here
+ * Architecture:
+ *   - alexa (local): users + vehicles (business data from external server)
+ *   - uradi (remote Traccar): devices + eventData (telemetry data)
+ *   - Link: alexa.vehicles.serial = uradi.devices.uniqueid
  */
 
-// Vehicle Database Settings (Remote Server - Uradi)
-define('DB_HOST', 'remote-db-server.example.com');
-define('DB_NAME', 'uradi');
-define('DB_USER', 'your_username');
-define('DB_PASS', 'your_password');
-define('DB_CHARSET', 'utf8mb4');
+// Local Database Settings (Alexa - Users + Vehicles)
+define('ALEXA_DB_HOST', 'localhost');
+define('ALEXA_DB_NAME', 'alexa');
+define('ALEXA_DB_USER', 'alexa_username');
+define('ALEXA_DB_PASS', 'alexa_password');
+define('ALEXA_DB_CHARSET', 'utf8mb4');
 
-// Local Users Database (for login - same server - Alexa)
-define('LOCAL_DB_HOST', 'localhost');
-define('LOCAL_DB_NAME', 'alexa');
-define('LOCAL_DB_USER', 'local_username');
-define('LOCAL_DB_PASS', 'local_password');
-define('LOCAL_DB_CHARSET', 'utf8mb4');
+// Remote Traccar Database Settings (Uradi - Telemetry Only)
+define('URADI_DB_HOST', 'traccar-server.example.com');
+define('URADI_DB_NAME', 'uradi');
+define('URADI_DB_USER', 'uradi_username');
+define('URADI_DB_PASS', 'uradi_password');
+define('URADI_DB_CHARSET', 'utf8mb4');
 
 /**
- * Get Vehicle Database Connection
+ * Get Alexa Database Connection (Users + Vehicles)
  */
-function getVehicleDB() {
+function getAlexaDB() {
     static $pdo = null;
     
     if ($pdo === null) {
         try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            $dsn = "mysql:host=" . ALEXA_DB_HOST . ";dbname=" . ALEXA_DB_NAME . ";charset=" . ALEXA_DB_CHARSET;
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ];
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+            $pdo = new PDO($dsn, ALEXA_DB_USER, ALEXA_DB_PASS, $options);
         } catch (PDOException $e) {
-            error_log("Vehicle DB Connection Error: " . $e->getMessage());
+            error_log("Alexa DB Connection Error: " . $e->getMessage());
             throw new Exception("Database connection failed");
         }
     }
@@ -43,22 +46,22 @@ function getVehicleDB() {
 }
 
 /**
- * Get Local Database Connection (for users)
+ * Get Uradi Database Connection (Traccar - Telemetry)
  */
-function getLocalDB() {
+function getUradiDB() {
     static $pdo = null;
     
     if ($pdo === null) {
         try {
-            $dsn = "mysql:host=" . LOCAL_DB_HOST . ";dbname=" . LOCAL_DB_NAME . ";charset=" . LOCAL_DB_CHARSET;
+            $dsn = "mysql:host=" . URADI_DB_HOST . ";dbname=" . URADI_DB_NAME . ";charset=" . URADI_DB_CHARSET;
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ];
-            $pdo = new PDO($dsn, LOCAL_DB_USER, LOCAL_DB_PASS, $options);
+            $pdo = new PDO($dsn, URADI_DB_USER, URADI_DB_PASS, $options);
         } catch (PDOException $e) {
-            error_log("Local DB Connection Error: " . $e->getMessage());
+            error_log("Uradi DB Connection Error: " . $e->getMessage());
             throw new Exception("Database connection failed");
         }
     }
