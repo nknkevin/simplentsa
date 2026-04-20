@@ -18,12 +18,29 @@ require_once 'config/config.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - <?php echo APP_NAME; ?></title>
+    <link rel="icon" href="<?php echo BRAND_FAVICON; ?>" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .login-container {
+            background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('<?php echo LOGIN_BACKGROUND; ?>');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .brand-logo {
+            max-width: 200px;
+            margin-bottom: 1rem;
+        }
+        :root {
+            --primary-color: <?php echo BRAND_PRIMARY_COLOR; ?>;
+        }
+    </style>
 </head>
 <body>
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
+                <img src="<?php echo BRAND_LOGO; ?>" alt="<?php echo APP_NAME; ?>" class="brand-logo" onerror="this.style.display='none'">
                 <h1><?php echo APP_NAME; ?></h1>
                 <p>Please sign in to continue</p>
             </div>

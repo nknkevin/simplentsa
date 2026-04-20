@@ -4,16 +4,16 @@
  * Configure your remote vehicle database connection here
  */
 
-// Vehicle Database Settings (Remote Server)
+// Vehicle Database Settings (Remote Server - Uradi)
 define('DB_HOST', 'remote-db-server.example.com');
-define('DB_NAME', 'vehicle_database');
+define('DB_NAME', 'uradi');
 define('DB_USER', 'your_username');
 define('DB_PASS', 'your_password');
 define('DB_CHARSET', 'utf8mb4');
 
-// Local Users Database (for login - same server)
+// Local Users Database (for login - same server - Alexa)
 define('LOCAL_DB_HOST', 'localhost');
-define('LOCAL_DB_NAME', 'users_database');
+define('LOCAL_DB_NAME', 'alexa');
 define('LOCAL_DB_USER', 'local_username');
 define('LOCAL_DB_PASS', 'local_password');
 define('LOCAL_DB_CHARSET', 'utf8mb4');

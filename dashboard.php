@@ -27,7 +27,10 @@ require_once 'config/config.php';
             <div class="dashboard-header">
                 <h1><?php echo APP_NAME; ?></h1>
                 <div class="user-info">
-                    <span class="user-name">Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+                    <span class="user-name">Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?> (<?php echo htmlspecialchars($_SESSION['role']); ?>)</span>
+                    <?php if ($_SESSION['role'] === 'admin'): ?>
+                        <a href="admin/users.php" class="btn btn-secondary">User Management</a>
+                    <?php endif; ?>
                     <button id="logout-btn" class="btn btn-danger">Logout</button>
                 </div>
             </div>
