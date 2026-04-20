@@ -8,6 +8,12 @@
 define('APP_NAME', 'Vehicle Tracking System');
 define('APP_VERSION', '1.0.0');
 
+// Branding - Customize these for your company
+define('BRAND_LOGO', 'assets/images/logo.png'); // Path to your logo
+define('BRAND_FAVICON', 'assets/images/favicon.ico'); // Path to favicon
+define('BRAND_PRIMARY_COLOR', '#2563eb'); // Primary brand color
+define('LOGIN_BACKGROUND', 'assets/images/login-bg.jpg'); // Login page background image
+
 // Session Settings
 define('SESSION_LIFETIME', 3600); // 1 hour in seconds
 
