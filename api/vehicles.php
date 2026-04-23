@@ -7,6 +7,10 @@
  * sms_sent, upd_time, online, online_i
  */
 
+// Temporary Debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 header('Content-Type: application/json');
 
@@ -39,23 +43,14 @@ try {
                    warning_sent, sms_sent, upd_time, online, online_i
             FROM vehicles 
             WHERE reg_no LIKE ? 
-               OR contact LIKE ?
-               OR cus_name LIKE ?
-               OR make LIKE ?
-               OR model LIKE ?
                OR vin_no LIKE ?
                OR chasis LIKE ?
-               OR dealer LIKE ?
-               OR action LIKE ?
-               OR tech LIKE ?
                OR serial LIKE ?
-               OR number LIKE ?
             LIMIT ?
         ");
         $searchTerm = "%{$search}%";
         $stmt->execute([
-            $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm,
-            $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm,
+             $searchTerm, $searchTerm,
             $searchTerm, $searchTerm, $limit
         ]);
     } else {

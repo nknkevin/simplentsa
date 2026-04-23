@@ -26,6 +26,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // Get vehicle serial from request (links alexa.vehicles.serial to uradi.devices.uniqueid)
 $serial = isset($_GET['serial']) ? trim($_GET['serial']) : '';
+$serial = '0'.$serial;
 
 if (empty($serial)) {
     $response['message'] = 'Vehicle serial required';
@@ -38,7 +39,7 @@ try {
     $uradiPDO = getUradiDB();
     
     // Step 1: Find device by uniqueid (which equals alexa.vehicles.serial)
-    $deviceStmt = $uradiPDO->prepare("SELECT id, name, status, lastUpdate FROM devices WHERE uniqueid = ? AND disabled = 0");
+    $deviceStmt = $uradiPDO->prepare("SELECT `id`, `name`, `online`, `rand`, `lastupdate` FROM `device` WHERE `uniqueid` = ? AND `disabled` = 0");
     $deviceStmt->execute([$serial]);
     $device = $deviceStmt->fetch();
     
@@ -53,12 +54,11 @@ try {
     // Step 2: Get latest telemetry data from eventData for this device
     $telemetryStmt = $uradiPDO->prepare("
         SELECT 
-            id, type, serverTime, eventTime, latitude, longitude, altitude,
-            speed, course, address, accuracy, batteryLevel, fuelLevel,
-            rpm, power, motion, totalDistance
+            id, servertime, fixtime, eactime, latitude, longitude,
+            speed, attributes, statuscode, signalwireconnected, powerwireconnected
         FROM eventData 
-        WHERE deviceId = ? 
-        ORDER BY eventTime DESC 
+        WHERE deviceid = ? 
+        ORDER BY fixtime DESC 
         LIMIT 1
     ");
     $telemetryStmt->execute([$deviceId]);
@@ -67,18 +67,17 @@ try {
     if ($telemetry) {
         // Add device info to response
         $telemetry['device_name'] = $device['name'];
-        $telemetry['device_status'] = $device['status'];
-        $telemetry['last_update'] = $device['lastUpdate'];
+        $telemetry['device_status'] = ($device['online'] == 0) ? 'online' : 'offline';
+        $telemetry['last_update'] = $device['lastupdate'];
         $telemetry['serial'] = $serial;
-        
         $response['success'] = true;
         $response['data'] = $telemetry;
     } else {
         $response['success'] = true;
         $response['data'] = [
-            'device_name' => $device['name'],
-            'device_status' => $device['status'],
-            'last_update' => $device['lastUpdate'],
+            'device_name' => $device['uniqueid'],
+            'device_status' => ($device['online'] == 0) ? 'online' : 'offline',
+            'last_update' => $device['lastupdate'],
             'serial' => $serial,
             'message' => 'No telemetry data available'
         ];

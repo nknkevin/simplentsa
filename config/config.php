@@ -5,11 +5,11 @@
  */
 
 // Application Settings
-define('APP_NAME', 'Vehicle Tracking System');
+define('APP_NAME', 'NTSA Telemetry System');
 define('APP_VERSION', '1.0.0');
 
 // Branding - Customize these for your company
-define('BRAND_LOGO', 'assets/images/logo.png'); // Path to your logo
+define('BRAND_LOGO', 'assets/images/logo.jpg'); // Path to your logo
 define('BRAND_FAVICON', 'assets/images/favicon.ico'); // Path to favicon
 define('BRAND_PRIMARY_COLOR', '#2563eb'); // Primary brand color
 define('LOGIN_BACKGROUND', 'assets/images/login-bg.jpg'); // Login page background image
@@ -18,7 +18,7 @@ define('LOGIN_BACKGROUND', 'assets/images/login-bg.jpg'); // Login page backgrou
 define('SESSION_LIFETIME', 3600); // 1 hour in seconds
 
 // Tracking Server Configuration
-define('TRACKING_SERVER_URL', 'http://tracking-server.example.com/api');
+define('TRACKING_SERVER_URL', 'https://example.com/api/'); // Base URL for tracking server API
 define('TRACKING_SERVER_TIMEOUT', 5); // seconds
 
 // Telemetry Update Interval (milliseconds)

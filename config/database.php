@@ -10,15 +10,15 @@
 // Local Database Settings (Alexa - Users + Vehicles)
 define('ALEXA_DB_HOST', 'localhost');
 define('ALEXA_DB_NAME', 'alexa');
-define('ALEXA_DB_USER', 'alexa_username');
-define('ALEXA_DB_PASS', 'alexa_password');
+define('ALEXA_DB_USER', 'testroot');
+define('ALEXA_DB_PASS', 'test');
 define('ALEXA_DB_CHARSET', 'utf8mb4');
 
 // Remote Traccar Database Settings (Uradi - Telemetry Only)
-define('URADI_DB_HOST', 'traccar-server.example.com');
+define('URADI_DB_HOST', 'example.com');
 define('URADI_DB_NAME', 'uradi');
-define('URADI_DB_USER', 'uradi_username');
-define('URADI_DB_PASS', 'uradi_password');
+define('URADI_DB_USER', 'testroot');
+define('URADI_DB_PASS', 'test');
 define('URADI_DB_CHARSET', 'utf8mb4');
 
 /**

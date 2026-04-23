@@ -22,7 +22,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 try {
-    $pdo = getLocalDB();
+    $pdo = getAlexaDB();
     
     switch ($action) {
         case 'list':

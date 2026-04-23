@@ -22,13 +22,14 @@ require_once 'config/config.php';
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         .login-container {
-            background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('<?php echo LOGIN_BACKGROUND; ?>');
+            /*background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('<?php echo LOGIN_BACKGROUND; ?>');
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
+            background-repeat: no-repeat;*/
+            background-color: #ccc;
         }
         .brand-logo {
-            max-width: 200px;
+            max-width: 350px;
             margin-bottom: 1rem;
         }
         :root {

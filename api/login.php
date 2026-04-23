@@ -31,7 +31,7 @@ if (empty($username) || empty($password)) {
 
 try {
     // Check local database for user
-    $pdo = getLocalDB();
+    $pdo = getAlexaDB();
     
     $stmt = $pdo->prepare("SELECT id, username, password, role FROM users WHERE username = ? AND active = 1");
     $stmt->execute([$username]);
