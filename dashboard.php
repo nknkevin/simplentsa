@@ -399,267 +399,283 @@ require_once 'config/config.php';
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="assets/js/app.js"></script>
     <script>
-        $(document).ready(function() {
-            let currentVehicleId = null;
-            let telemetryInterval = null;
+    $(document).ready(function() {
+        console.log("Dashboard initialized");
 
-            // Logout functionality
-            $('#logout-btn').click(function() {
-                $.post('api/logout.php', function() {
-                    window.location.href = 'index.php';
-                });
-            });
+        // Global State Variables
+        let currentVehicleId = null;
+        let currentSerial = null;        // Store serial globally for telemetry
+        let lastKnownTelemetryId = 0;    // Track last ID to prevent duplicates
+        let telemetryInterval = null;
+        let searchTimeout;
 
-            // Search with debounce for smooth performance
-            let searchTimeout;
-
-            $('#search-input').on('input', function() {
-                clearTimeout(searchTimeout); // Cancel previous pending search
-                const query = $(this).val().trim();
-
-                if (query.length >= 2) {
-                    // Wait 300ms after user stops typing before searching
-                    searchTimeout = setTimeout(() => performSearch(query), 300);
-                } else if (query.length === 0) {
-                    // Hide results if input is cleared
-                    $('#vehicle-results').removeClass('active');
-                    $('#vehicle-results-body').empty();
-                }
-            });
-
-            function performSearch(query) {
-                console.log("Searching for:", query); // Debug log
-
-                $('#vehicle-results-body').html('<tr><td colspan="7" class="text-center"><span class="loading"></span> Searching...</td></tr>');
-                $('#vehicle-results').addClass('active');
-
-                $.ajax({
-                    url: 'api/vehicles.php', // Ensure this path is correct relative to dashboard.php
-                    method: 'GET',
-                    data: {
-                        search: query
-                    },
-                    success: function(response) {
-                        console.log("API Response:", response); // Debug log
-
-                        // Check if response is valid JSON and has success flag
-                        if (response && response.success && response.data) {
-                            if (response.data.length > 0) {
-                                let html = '';
-                                response.data.forEach(vehicle => {
-                                    html += `
-                            <tr data-id="${vehicle.id}" data-serial="${vehicle.serial || ''}">
-                                <td>${escapeHtml(vehicle.serial || 'N/A')}</td>
-                                <td>${escapeHtml(vehicle.reg_no || 'N/A')}</td>
-                                <td>${escapeHtml(vehicle.chassis || 'N/A')}</td>
-                                <td><span class="badge ${vehicle.status_renew == 1 ? 'badge-success' : 'badge-warning'}">${vehicle.status_renew == 1 ? 'Active' : 'Inactive'}</span></td>
-                            </tr>
-                        `;
-                                });
-                                $('#vehicle-results-body').html(html);
-
-                                // Re-attach click events
-                                $('.vehicle-table tbody tr').click(function() {
-                                    const vehicleId = $(this).data('id');
-                                    const serial = $(this).data('serial');
-                                    loadVehicleDetails(vehicleId, serial);
-                                });
-                            } else {
-                                $('#vehicle-results-body').html('<tr><td colspan="7" class="text-center">No vehicles found</td></tr>');
-                            }
-                        } else {
-                            console.error("Invalid API response structure:", response);
-                            $('#vehicle-results-body').html('<tr><td colspan="7" class="text-center" style="color: orange;">Unexpected response format. Check console.</td></tr>');
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("AJAX Error:", status, error);
-                        console.error("Response Text:", xhr.responseText);
-
-                        let msg = "Error loading vehicles.";
-                        if (xhr.status === 404) msg = "API endpoint not found (404). Check file path.";
-                        if (xhr.status === 500) msg = "Server error (500). Check PHP logs.";
-
-                        $('#vehicle-results-body').html(`<tr><td colspan="7" class="text-center" style="color: red;">${msg}</td></tr>`);
-                    }
-                });
+        // --- INSTANT SEARCH LOGIC ---
+        
+        // Search as you type (debounced)
+        $('#search-input').on('input', function() {
+            clearTimeout(searchTimeout);
+            const query = $(this).val().trim();
+            
+            if (query.length >= 2) {
+                // Wait 300ms after user stops typing
+                searchTimeout = setTimeout(() => performSearch(query), 300);
+            } else if (query.length === 0) {
+                // Hide results if input cleared
+                $('#vehicle-results').removeClass('active');
+                $('#vehicle-results-body').empty();
             }
+        });
 
-            /*
-            function performSearch(query) {
-                $('#vehicle-results-body').html('<tr><td colspan="7" class="text-center"><span class="loading"></span> Searching...</td></tr>');
-                $('#vehicle-results').addClass('active');
-
-                $.ajax({
-                    url: 'api/vehicles.php',
-                    method: 'GET',
-                    data: {
-                        search: query
-                    },
-                    success: function(response) {
-                        if (response.success && response.data.length > 0) {
-                            let html = '';
-                            response.data.forEach(vehicle => {
-                                html += `
+        function performSearch(query) {
+            console.log("Searching for:", query);
+            
+            $('#vehicle-results-body').html('<tr><td colspan="4" class="text-center"><span class="loading"></span> Searching...</td></tr>');
+            $('#vehicle-results').addClass('active');
+            
+            $.ajax({
+                url: 'api/vehicles.php',
+                method: 'GET',
+                data: { search: query },
+                success: function(response) {
+                    console.log("API Response:", response);
+                    
+                    // FIX: API returns 'data' array, not 'vehicles'
+                    if (response && response.success && response.data && response.data.length > 0) {
+                        let html = '';
+                        response.data.forEach(vehicle => {
+                            html += `
                                 <tr data-id="${vehicle.id}" data-serial="${vehicle.serial || ''}">
-                                    <td>${escapeHtml(vehicle.cus_name || vehicle.customer_name || 'N/A')}</td>
+                                    <td><strong>${escapeHtml(vehicle.reg_no || 'N/A')}</strong></td>
+                                    <td>${escapeHtml(vehicle.cus_name || 'N/A')}</td>
                                     <td>${escapeHtml(vehicle.serial || 'N/A')}</td>
-                                    <td>${escapeHtml(vehicle.reg_no || 'N/A')}</td>
-                                    <td>${escapeHtml(vehicle.vin_no || vehicle.vin || 'N/A')}</td>
-                                    <td>${escapeHtml(vehicle.contact || 'N/A')}</td>
                                     <td><span class="badge ${vehicle.status_renew == 1 ? 'badge-success' : 'badge-warning'}">${vehicle.status_renew == 1 ? 'Active' : 'Inactive'}</span></td>
                                 </tr>
                             `;
-                            });
-                            $('#vehicle-results-body').html(html);
-
-                            // Click to view details
-                            $('.vehicle-table tbody tr').click(function() {
-                                const vehicleId = $(this).data('id');
-                                const serial = $(this).data('serial');
-                                loadVehicleDetails(vehicleId, serial);
-                            });
-                        } else {
-                            $('#vehicle-results-body').html('<tr><td colspan="7" class="text-center">No vehicles found</td></tr>');
-                        }
-                    },
-                    error: function() {
-                        $('#vehicle-results-body').html('<tr><td colspan="7" class="text-center" style="color: red;">Error loading vehicles</td></tr>');
+                        });
+                        $('#vehicle-results-body').html(html);
+                        
+                        // Click to view details
+                        $('.vehicle-table tbody tr').click(function() {
+                            const vehicleId = $(this).data('id');
+                            const serial = $(this).data('serial');
+                            loadVehicleDetails(vehicleId, serial);
+                        });
+                    } else {
+                        $('#vehicle-results-body').html('<tr><td colspan="4" class="text-center">No vehicles found</td></tr>');
                     }
-                });
-            } */
+                },
+                error: function(xhr, status, error) {
+                    console.error("AJAX Error:", status, error);
+                    $('#vehicle-results-body').html('<tr><td colspan="4" class="text-center" style="color: red;">Error loading vehicles. Check console.</td></tr>');
+                }
+            });
+        }
 
-            function loadVehicleDetails(vehicleId, serial) {
-                // Hide results, show details
-                $('#vehicle-results').removeClass('active');
-                $('#vehicle-details-panel').addClass('active');
+        // --- VEHICLE DETAILS & TELEMETRY STREAMING ---
 
-                // Load full vehicle data
-                $.ajax({
-                    url: 'api/vehicles.php',
-                    method: 'GET',
-                    data: {
-                        id: vehicleId
-                    },
-                    success: function(response) {
-                        if (response.success &&  response.data && response.data.length > 0) {
-                            const v = response.data[0];
-                            currentVehicleId = vehicleId;
-
-                            $('#details-vehicle-title').text(`Vehicle: ${v.serial || v.reg_no || 'Unknown'}`);
-
-                            // Build detailed grid
-                            let gridHtml = `
-                            <div class="detail-item"><div class="detail-label">Registration No</div><div class="detail-value">${escapeHtml(v.reg_no) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Customer Name</div><div class="detail-value">${escapeHtml(v.cus_name) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Contact</div><div class="detail-value">${escapeHtml(v.contact) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Make</div><div class="detail-value">${escapeHtml(v.make) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Model</div><div class="detail-value">${escapeHtml(v.model) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">VIN Number</div><div class="detail-value">${escapeHtml(v.vin_no) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Chassis Number</div><div class="detail-value">${escapeHtml(v.chasis) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Dealer</div><div class="detail-value">${escapeHtml(v.dealer) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Serial (Device ID)</div><div class="detail-value">${escapeHtml(v.serial) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Tech</div><div class="detail-value">${escapeHtml(v.tech) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Action</div><div class="detail-value">${escapeHtml(v.action) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="badge ${v.status_renew == 1 ? 'badge-success' : 'badge-warning'}">${v.status_renew == 1 ? 'Active' : 'Inactive'}</span></div></div>
-                            <div class="detail-item"><div class="detail-label">Last Updated</div><div class="detail-value">${escapeHtml(v.upd_time) || 'N/A'}</div></div>
-                            <div class="detail-item"><div class="detail-label">Online Status</div><div class="detail-value">${escapeHtml(v.online) || 'N/A'}</div></div>
+        function loadVehicleDetails(vehicleId, serial) {
+            // UI Transition
+            $('#vehicle-results').removeClass('active');
+            $('#vehicle-details-panel').addClass('active');
+            
+            // Save state
+            currentVehicleId = vehicleId;
+            currentSerial = serial; 
+            lastKnownTelemetryId = 0; // Reset telemetry tracker for new vehicle
+            
+            $('#details-vehicle-title').text(`Vehicle Details: ${serial || 'Unknown'}`);
+            $('#vehicle-data-grid').html('<div class="text-center"><span class="loading"></span> Loading details...</div>');
+            
+            // Load Full Vehicle Data
+            $.ajax({
+                url: 'api/vehicles.php',
+                method: 'GET',
+                data: { id: vehicleId },
+                success: function(response) {
+                    if (response && response.success && response.data && response.data[0]) {
+                        const v = response.data[0]; // FIX: API returns object in 'data' array
+                        
+                        // Build Detailed Grid
+                        let gridHtml = `
+                            <div class="detail-row"><div class="detail-label">Registration No</div><div class="detail-value">${escapeHtml(v.reg_no)}</div></div>
+                            <div class="detail-row"><div class="detail-label">Customer Name</div><div class="detail-value">${escapeHtml(v.cus_name)}</div></div>
+                            <div class="detail-row"><div class="detail-label">Contact</div><div class="detail-value">${escapeHtml(v.contact)}</div></div>
+                            <div class="detail-row"><div class="detail-label">Make/Model</div><div class="detail-value">${escapeHtml(v.make)} ${escapeHtml(v.model)}</div></div>
+                            <div class="detail-row"><div class="detail-label">VIN / Chassis</div><div class="detail-value">${escapeHtml(v.vin_no)} / ${escapeHtml(v.chasis)}</div></div>
+                            <div class="detail-row"><div class="detail-label">Serial (Device ID)</div><div class="detail-value"><code>${escapeHtml(v.serial)}</code></div></div>
+                            <div class="detail-row"><div class="detail-label">Status</div><div class="detail-value"><span class="badge ${v.status_renew == 1 ? 'badge-success' : 'badge-warning'}">${v.status_renew == 1 ? 'Active' : 'Inactive'}</span></div></div>
+                            <div class="detail-row"><div class="detail-label">Last Updated</div><div class="detail-value">${escapeHtml(v.upd_time)}</div></div>
                         `;
-
-                            $('#vehicle-data-grid').html(gridHtml);
-
-                            // Start telemetry stream
-                            startTelemetryStream(serial);
-                        }
+                        $('#vehicle-data-grid').html(gridHtml);
+                        
+                        // START TELEMETRY STREAM
+                        startTelemetryStream(serial);
+                    } else {
+                        $('#vehicle-data-grid').html('<div class="text-center text-danger">Failed to load vehicle details.</div>');
                     }
-                });
-            }
-
-            function startTelemetryStream(serial) {
-                if (!serial) {
-                    $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center">No serial number available for telemetry</td></tr>');
-                    return;
+                },
+                error: function() {
+                    $('#vehicle-data-grid').html('<div class="text-center text-danger">Error connecting to server.</div>');
                 }
+            });
+        }
 
-                loadTelemetry(serial);
-                telemetryInterval = setInterval(() => loadTelemetry(serial), 5000);
+        function startTelemetryStream(serial) {
+            if (!serial) {
+                $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center">No serial number available</td></tr>');
+                return;
+            }
+            
+            console.log("Starting telemetry stream for:", serial);
+            
+            // 1. INITIAL LOAD: Get last 100 records immediately
+            loadTelemetry(serial, 100, true); 
+            
+            // 2. STREAMING: Poll every 5 seconds for NEW records only
+            if (telemetryInterval) clearInterval(telemetryInterval);
+            telemetryInterval = setInterval(() => {
+                loadTelemetry(serial, 50, false); // false = append mode
+            }, 5000);
+        }
+
+        function loadTelemetry(serial, limit = 100, isInitialLoad = true) {
+            let params = { serial: serial, limit: limit };
+            
+            // If streaming, only fetch records newer than the last one we have
+            if (!isInitialLoad && lastKnownTelemetryId > 0) {
+                params.since_id = lastKnownTelemetryId;
             }
 
-            function loadTelemetry(serial) {
-                $.ajax({
-                    url: 'api/telemetry.php',
-                    method: 'GET',
-                    data: {
-                        serial: serial,
-                        limit: 100
-                    },
-                    success: function(response) {
-                        if (response.success && response.data.length > 0) {
-                            let html = '';
-                            response.data.forEach(point => {
-                                const dateObj = new Date(point.devicetime);
-                                const dateStr = dateObj.toLocaleDateString();
-                                const timeStr = dateObj.toLocaleTimeString();
-                                const mapUrl = `https://www.google.com/maps?q=${point.latitude},${point.longitude}`;
+            $.ajax({
+                url: 'api/telemetry.php',
+                method: 'GET',
+                data: params,
+                success: function(response) {
+                    if (response && response.success && response.data) {
+                        const points = response.data;
+                        
+                        if (points.length === 0) {
+                            if (isInitialLoad) {
+                                $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center text-muted">No telemetry data available for this device.</td></tr>');
+                            }
+                            return; // No new data to append
+                        }
 
-                                html += `
-                                <tr>
-                                    <td>${dateStr}</td>
-                                    <td>${timeStr}</td>
-                                    <td>${(point.speed || 0).toFixed(1)}</td>
-                                    <td>${(point.latitude || 0).toFixed(6)}</td>
-                                    <td>${(point.longitude || 0).toFixed(6)}</td>
-                                    <td><a href="${mapUrl}" target="_blank" class="map-link">🗺️ View</a></td>
-                                    <td>${escapeHtml(point.attributes || '')}</td>
-                                </tr>
-                            `;
-                            });
+                        // Update Last Known ID (Highest ID in this batch)
+                        const maxId = Math.max(...points.map(p => p.id));
+                        if (maxId > lastKnownTelemetryId) {
+                            lastKnownTelemetryId = maxId;
+                        }
+
+                        let html = '';
+                        points.forEach(point => {
+                            html += buildTelemetryRow(point);
+                        });
+
+                        if (isInitialLoad) {
+                            // Replace entire table body
                             $('#telemetry-stream-body').html(html);
-                            $('#telemetry-timestamp').text('Last updated: ' + new Date().toLocaleTimeString());
+                            console.log(`Loaded initial ${points.length} records.`);
                         } else {
-                            $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center">No telemetry data available</td></tr>');
+                            // Prepend new records to the top
+                            $('#telemetry-stream-body').prepend(html);
+                            console.log(`Appended ${points.length} new records.`);
+                            
+                            // Optional: Limit DOM size by removing old rows if > 200
+                            const rows = $('#telemetry-stream-body tr');
+                            if (rows.length > 200) {
+                                rows.slice(150).remove();
+                            }
                         }
-                    },
-                    error: function() {
-                        $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center" style="color: red;">Error loading telemetry</td></tr>');
+                        
+                        $('#telemetry-timestamp').text('Live • Last update: ' + new Date().toLocaleTimeString());
+                    } else {
+                        if (isInitialLoad && (!response || !response.success)) {
+                            $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center text-danger">Error loading telemetry. Check API logs.</td></tr>');
+                        }
                     }
-                });
-            }
-
-            // Close details and return to search
-            $('#close-details').click(function() {
-                $('#vehicle-details-panel').removeClass('active');
-                $('#search-input').val('');
-                $('#vehicle-results').addClass('active');
-                currentVehicleId = null;
-                if (telemetryInterval) {
-                    clearInterval(telemetryInterval);
-                    telemetryInterval = null;
+                },
+                error: function(xhr, status, error) {
+                    console.error("Telemetry Error:", status, error);
+                    if (isInitialLoad) {
+                        $('#telemetry-stream-body').html('<tr><td colspan="7" class="text-center text-danger">Connection failed.</td></tr>');
+                    }
                 }
             });
+        }
 
-            // Print report
-            $('#print-report').click(function() {
-                window.print();
-            });
-
-            // Manual refresh telemetry
-            $('#refresh-telemetry').click(function() {
-                if (currentVehicleId) {
-                    const serial = $('#vehicle-data-grid').contains('[data-label="Serial (Device ID)"]').text().trim();
-                    loadTelemetry(serial);
+        // Helper: Build a single telemetry row
+        function buildTelemetryRow(point) {
+            const dateObj = new Date(point.devicetime);
+            const dateStr = dateObj.toLocaleDateString();
+            const timeStr = dateObj.toLocaleTimeString();
+            const mapUrl = `https://www.google.com/maps?q=${point.latitude},${point.longitude}`;
+            
+            // Parse attributes if JSON string
+            let notes = point.attributes || '';
+            try {
+                if (typeof notes === 'string' && notes.startsWith('{')) {
+                    const attr = JSON.parse(notes);
+                    notes = [];
+                    if (attr.alarm) notes.push(`⚠️ ${attr.alarm}`);
+                    if (attr.ignition) notes.push('🔑 Ignition ON');
+                    if (attr.battery) notes.push(`🔋 ${attr.battery}`);
+                    notes = notes.join(' | ');
                 }
-            });
+            } catch(e) {}
 
-            // Helper: Escape HTML
-            function escapeHtml(text) {
-                if (!text) return '';
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
+            return `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${timeStr}</td>
+                    <td>${(point.speed || 0).toFixed(1)} km/h</td>
+                    <td>${(point.latitude || 0).toFixed(5)}</td>
+                    <td>${(point.longitude || 0).toFixed(5)}</td>
+                    <td><a href="${mapUrl}" target="_blank" class="btn-link">🗺️ Map</a></td>
+                    <td><small>${escapeHtml(notes)}</small></td>
+                </tr>
+            `;
+        }
+
+        // --- EVENT HANDLERS ---
+
+        // Close details and return to search
+        $('#close-details').click(function() {
+            $('#vehicle-details-panel').removeClass('active');
+            $('#search-input').val('');
+            $('#vehicle-results').addClass('active');
+            
+            // Cleanup
+            currentVehicleId = null;
+            currentSerial = null;
+            lastKnownTelemetryId = 0;
+            if (telemetryInterval) {
+                clearInterval(telemetryInterval);
+                telemetryInterval = null;
             }
         });
+
+        // Print report
+        $('#print-report').click(function() {
+            window.print();
+        });
+
+        // Manual refresh telemetry
+        $('#refresh-telemetry').click(function() {
+            if (currentSerial) {
+                console.log("Manual refresh for:", currentSerial);
+                loadTelemetry(currentSerial, 20, false);
+            }
+        });
+
+        // Helper: Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    });
     </script>
 </body>
-
 </html>
